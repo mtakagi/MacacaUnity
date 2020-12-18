@@ -56,7 +56,7 @@ namespace Macaca
 
         private bool IsLetter(char c)
         {
-            return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z';
+            return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' || c == '_';
         }
 
         private bool IsDigit(char c)
@@ -68,7 +68,7 @@ namespace Macaca
         {
             var index = this.currentIndex - 1;
 
-            while (IsLetter(this.line[this.currentIndex]))
+            while (this.currentIndex < this.maxLength && IsLetter(this.line[this.currentIndex]))
             {
                 this.currentIndex++;
             }
@@ -80,7 +80,7 @@ namespace Macaca
         {
             var index = this.currentIndex - 1;
 
-            while (IsDigit(this.line[this.currentIndex]))
+            while (this.currentIndex < this.maxLength && IsDigit(this.line[this.currentIndex]))
             {
                 this.currentIndex++;
             }

@@ -15,12 +15,12 @@ public class Console : MonoBehaviour
     public void REPL()
     {
         var lexer = new Macaca.Lexer(mInputField.text);
+        var parser = new Macaca.Parser(lexer);
         var sb = new System.Text.StringBuilder(mInputField.text);
 
-        for (var token = lexer.NextToken(); token.Type != Macaca.TokenType.EOF; token = lexer.NextToken())
-        {
-            sb.Append($"\nType: {token.Type}, Literal: {token.Literal}");
-        }
+        sb.Append('\n');
+        sb.Append(parser.ParseProgram().String);
+        sb.Append('\n');
 
         mInputField.text = sb.ToString();
     }
