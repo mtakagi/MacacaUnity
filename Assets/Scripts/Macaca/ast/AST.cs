@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Text;
 
 namespace Macaca
@@ -158,6 +159,90 @@ namespace Macaca
         public string TokenLiteral => this.Token.Literal;
 
         public string String => this.Token.Literal;
+    }
+
+    public class StringLiteral : Expression
+    {
+        public Token Token { get; set; }
+        public string Value { get; set; }
+
+        public string TokenLiteral => this.Token.Literal;
+
+        public string String => this.Token.Literal;
+    }
+
+    public class ArrayLiteral : Expression
+    {
+        public Token Token { get; set; }
+        public Expression[] Elements { get; set; }
+
+        public string TokenLiteral => this.Token.Literal;
+
+        public string String
+        {
+            get
+            {
+                var sb = new StringBuilder("[");
+
+                for (var i = 0; i < this.Elements.Length; i++)
+                {
+                    if (i + 1 == this.Elements.Length)
+                    {
+                        sb.Append(this.Elements[i].String);
+                    }
+                    else
+                    {
+                        sb.Append($"{this.Elements[i].String}, ");
+                    }
+                }
+
+                sb.Append("]");
+
+                return sb.ToString();
+            }
+        }
+    }
+
+    public class IndexExpresssion : Expression
+    {
+        public Token Token { get; set; }
+        public Expression Left { get; set; }
+        public Expression Index { get; set; }
+
+        public string TokenLiteral => this.Token.Literal;
+
+        public string String => $"({this.Left.String}[{this.Index.String}])";
+    }
+
+    public class HashLiteral : Expression
+    {
+        public Token Token { get; set; }
+        public Dictionary<Expression, Expression> Pairs { get; set; }
+
+        public string TokenLiteral => this.Token.Literal;
+
+        public string String
+        {
+            get
+            {
+                var sb = new StringBuilder("{");
+
+                var i = 0;
+
+                foreach (var kvp in this.Pairs) {
+                    if (i == this.Pairs.Count - 1) {
+                        sb.Append($"{kvp.Key}{kvp.Value}");
+                    } else {
+                        sb.Append($"{kvp.Key}{kvp.Value}, ");
+                    }
+                    i++;
+                }
+
+                sb.Append("]");
+
+                return sb.ToString();
+            }
+        }
     }
 
     public class PrefixExpression : Expression

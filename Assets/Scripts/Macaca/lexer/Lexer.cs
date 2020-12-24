@@ -88,6 +88,18 @@ namespace Macaca
             return this.line.Substring(index, this.currentIndex - index);
         }
 
+        private string ReadString()
+        {
+            var index = this.currentIndex;
+
+            while (this.currentIndex < this.maxLength && this.line[this.currentIndex] != '"')
+            {
+                this.currentIndex++;
+            }
+
+            return this.line.Substring(index, this.currentIndex++ - index);
+        }
+
         public Token NextToken()
         {
             char nextChar;
@@ -204,6 +216,12 @@ namespace Macaca
                         Type = TokenType.SEMICOLON,
                         Literal = nextChar.ToString()
                     };
+                case ':':
+                    return new Token()
+                    {
+                        Type = TokenType.COLON,
+                        Literal = nextChar.ToString()
+                    };
                 case ',':
                     return new Token()
                     {
@@ -232,6 +250,24 @@ namespace Macaca
                     return new Token()
                     {
                         Type = TokenType.RPAREN,
+                        Literal = nextChar.ToString()
+                    };
+                case '"':
+                    return new Token()
+                    {
+                        Type = TokenType.STRING,
+                        Literal = this.ReadString()
+                    };
+                case '[':
+                    return new Token()
+                    {
+                        Type = TokenType.LBRACKET,
+                        Literal = nextChar.ToString()
+                    };
+                case ']':
+                    return new Token()
+                    {
+                        Type = TokenType.RBRACKET,
                         Literal = nextChar.ToString()
                     };
                 default:

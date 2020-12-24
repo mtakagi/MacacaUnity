@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using Macaca;
 
@@ -167,7 +168,9 @@ public class ParserTest
             new { input = "!(true == true)", expected = "(!(true == true))" },
             new { input = "a + add(b * c) + d", expected = "((a + add((b * c))) + d)" },
             new { input = "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))", expected = "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))" },
-            new { input = "add(a + b + c * d / f + g)", expected = "add((((a + b) + ((c * d) / f)) + g))" }
+            new { input = "add(a + b + c * d / f + g)", expected = "add((((a + b) + ((c * d) / f)) + g))" },
+            new { input = "a * [1, 2, 3, 4][b * c] * d", expected = "((a * ([1, 2, 3, 4][(b * c)])) * d)" },
+            new { input = "add(a * b[2], b[1], 2 * [1, 2][1])", expected = "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))" }
         };
 
         foreach (var test in tests)
@@ -380,6 +383,197 @@ public class ParserTest
             {
                 Assert.AreEqual(test.expected[i], call.Arguments[i].String);
             }
+        }
+    }
+
+    [Test]
+    public void ParseStringLiteralTest()
+    {
+        var input = "\"hello world\";";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var literal = statement.Expression as StringLiteral;
+
+        Assert.NotNull(literal);
+        Assert.AreEqual("hello world", literal.Value);
+    }
+
+    [Test]
+    public void ParseEmptyArrayLiteralTest()
+    {
+        var input = "[]";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var array = statement.Expression as ArrayLiteral;
+
+        Assert.NotNull(array);
+        Assert.That(array.Elements.Length, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void ParseArrayLiteralTest()
+    {
+        var input = "[1, 2 * 2, 3 + 3]";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var array = statement.Expression as ArrayLiteral;
+
+        Assert.NotNull(array);
+        Assert.That(array.Elements.Length, Is.EqualTo(3));
+        TestIntegerLiteral(array.Elements[0], 1);
+        TestInfixExpression(array.Elements[1], 2, "*", 2);
+        TestInfixExpression(array.Elements[2], 3, "+", 3);
+    }
+
+    [Test]
+    public void ParseIndexExpressionTest()
+    {
+        var input = "myArray[1 + 1]";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var expression = statement.Expression as IndexExpresssion;
+
+        Assert.NotNull(expression);
+        TestIdentifier(expression.Left, "myArray");
+        TestInfixExpression(expression.Index, 1, "+", 1);
+    }
+
+    [Test]
+    public void ParseEmptyHashLiteralTest()
+    {
+        var input = "{}";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var hash = statement.Expression as HashLiteral;
+
+        Assert.NotNull(hash);
+        Assert.That(hash.Pairs.Count, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void ParseHashLiteralTest()
+    {
+        var input = "{\"one\" : 1, \"two\" : 2, \"three\" : 3}";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var hash = statement.Expression as HashLiteral;
+        var expected = new Dictionary<string, long>()
+        {
+            {"one", 1},
+            {"two", 2},
+            {"three", 3},
+        };
+
+        Assert.NotNull(hash);
+        Assert.That(hash.Pairs.Count, Is.EqualTo(expected.Count));
+
+        foreach (var kvp in hash.Pairs)
+        {
+            var literal = kvp.Key as StringLiteral;
+
+            Assert.NotNull(literal);
+            TestIntegerLiteral(kvp.Value, expected[literal.Value]);
+        }
+    }
+
+    [Test]
+    public void ParseBooleanHashLiteralTest()
+    {
+        var input = "{true : 1, false : 2}";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var hash = statement.Expression as HashLiteral;
+        var expected = new Dictionary<string, long>()
+        {
+            {"true", 1},
+            {"false", 2},
+        };
+
+        Assert.NotNull(hash);
+        Assert.That(hash.Pairs.Count, Is.EqualTo(expected.Count));
+
+        foreach (var kvp in hash.Pairs)
+        {
+            var boolean = kvp.Key as Boolean;
+
+            Assert.NotNull(boolean);
+            TestIntegerLiteral(kvp.Value, expected[boolean.String]);
+        }
+    }
+
+    [Test]
+    public void ParseIntegerHashLiteralTest()
+    {
+        var input = "{1 : 1, 2 : 2, 3 : 3}";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var hash = statement.Expression as HashLiteral;
+        var expected = new Dictionary<string, long>()
+        {
+            {"1", 1},
+            {"2", 2},
+            {"3", 3},
+        };
+
+        Assert.NotNull(hash);
+        Assert.That(hash.Pairs.Count, Is.EqualTo(expected.Count));
+
+        foreach (var kvp in hash.Pairs)
+        {
+            var integer = kvp.Key as IntegerLiteral;
+
+            Assert.NotNull(integer);
+            TestIntegerLiteral(kvp.Value, expected[integer.String]);
+        }
+    }
+
+    [Test]
+    public void ParseHashLiteralWithExpressionTest()
+    {
+        var input = "{\"one\" : 0 + 1, \"two\" : 10 - 8, \"three\" : 15 / 5}";
+        var lexer = new Lexer(input);
+        var parser = new Parser(lexer);
+        var program = parser.ParseProgram();
+        var statement = program.statements[0] as ExpressionStatement;
+        var hash = statement.Expression as HashLiteral;
+        var expected = new Dictionary<string, System.Action<Expression>>()
+        {
+            {"one", (expression) => {
+                TestInfixExpression(expression, 0, "+", 1);
+            }},
+            {"two", (expression) => {
+                TestInfixExpression(expression, 10, "-", 8);
+            }},
+            {"three", (expression) => {
+                TestInfixExpression(expression, 15, "/", 5);
+            }},
+        };
+
+        Assert.NotNull(hash);
+        Assert.That(hash.Pairs.Count, Is.EqualTo(3));
+
+        foreach (var kvp in hash.Pairs)
+        {
+            var literal = kvp.Key as StringLiteral;
+
+            Assert.NotNull(literal);
+            expected[literal.String](kvp.Value);
         }
     }
 

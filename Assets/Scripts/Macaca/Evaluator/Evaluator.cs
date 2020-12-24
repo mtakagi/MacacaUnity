@@ -56,8 +56,19 @@ namespace Macaca
                     }
                 case IntegerLiteral integer:
                     return new Integer() { Value = integer.Value };
+                case StringLiteral stringLiteral:
+                    return new String() { Value = stringLiteral.Value };
                 case Boolean boolean:
                     return boolean.Value ? True : False;
+                case ArrayLiteral array:
+                    var elements = this.EvalExpressions(array.Elements, env);
+                    if (elements.Length == 1 && this.IsError(elements[0]))
+                    {
+                        return elements[0];
+                    }
+                    return new Array() { Elements = elements };
+                case HashLiteral hash:
+                    return this.EvalHashLiteral(hash, env);
                 case PrefixExpression prefix:
                     {
                         var right = this.Eval(prefix.Right, env);
@@ -115,6 +126,20 @@ namespace Macaca
                         }
 
                         return this.ApplyFunction(function, args);
+                    }
+                case IndexExpresssion indexExpresssion:
+                    {
+                        var left = this.Eval(indexExpresssion.Left, env);
+                        if (this.IsError(left))
+                        {
+                            return left;
+                        }
+                        var index = this.Eval(indexExpresssion.Index, env);
+                        if (this.IsError(index))
+                        {
+                            return index;
+                        }
+                        return this.EvalIndexExpression(left, index);
                     }
                 default:
                     return null;
@@ -178,6 +203,10 @@ namespace Macaca
             if (light.Type == ObjectType.INTEGER && right.Type == ObjectType.INTEGER)
             {
                 return this.EvalIntegerInfixExpression(op, light, right);
+            }
+            else if (light.Type == ObjectType.STRING && right.Type == ObjectType.STRING)
+            {
+                return this.EvalStringInfixExpression(op, light, right);
             }
             else if (op == "==")
             {
@@ -252,6 +281,18 @@ namespace Macaca
             }
         }
 
+        private Object EvalStringInfixExpression(string op, Object left, Object right)
+        {
+            if (op != "+")
+            {
+                return new Error() { Message = $"Unknown operator: {left.Type} {op} {right.Type}" };
+            }
+            var leftString = left as String;
+            var rightString = right as String;
+
+            return new String() { Value = $"{leftString.Value}{rightString.Value}" };
+        }
+
         private Object EvalIfExpression(IfExpression expression, Environment env)
         {
             var condition = this.Eval(expression.Condition, env);
@@ -279,12 +320,103 @@ namespace Macaca
         {
             Object obj = null;
 
-            if (!env.TryGetValue(identifier.Value, out obj))
+            if (env.TryGetValue(identifier.Value, out obj))
             {
-                return new Error() { Message = $"Identifier not found: {identifier.Value}" };
+                return obj;
             }
 
-            return obj;
+            Builtin builtin = null;
+
+            if (Builtins.Functions.TryGetValue(identifier.Value, out builtin))
+            {
+                return builtin;
+            }
+
+            return new Error() { Message = $"Identifier not found: {identifier.Value}" };
+        }
+
+        private Object EvalIndexExpression(Object left, Object index)
+        {
+            if (left.Type == ObjectType.ARRAY && index.Type == ObjectType.INTEGER)
+            {
+                return this.EvalArrayIndexExpression(left, index);
+            }
+            else if (left.Type == ObjectType.HASH)
+            {
+                return this.EvalHashIndexExpression(left, index);
+            }
+            else
+            {
+                return new Error() { Message = $"Index operator not supported: {left.Type}" };
+            }
+        }
+
+        private Object EvalArrayIndexExpression(Object left, Object index)
+        {
+            var array = left as Array;
+            var i = (index as Integer).Value;
+            var max = array.Elements.Length - 1;
+
+            if (i < 0 || i > max)
+            {
+                return Null;
+            }
+
+            return array.Elements[i];
+        }
+
+        private Object EvalHashLiteral(HashLiteral hash, Environment env)
+        {
+            var pairs = new Dictionary<HashKey, HashPair>();
+
+            foreach (var kvp in hash.Pairs)
+            {
+                var key = this.Eval(kvp.Key, env);
+
+                if (this.IsError(key))
+                {
+                    return key;
+                }
+
+                var hashKey = key as Hashable;
+
+                if (hashKey == null)
+                {
+                    return new Error() { Message = $"Unusable as hash key: {key.Type}" };
+                }
+
+                var value = this.Eval(kvp.Value, env);
+
+                if (this.IsError(value))
+                {
+                    return value;
+                }
+
+                var hashed = hashKey.HashKey();
+                pairs[hashed] = new HashPair() { Key = key, Value = value };
+            }
+
+            return new Hash() { Pairs = pairs };
+        }
+
+        private Object EvalHashIndexExpression(Object left, Object index)
+        {
+            var hash = left as Hash;
+            var key = index as Hashable;
+
+            if (key == null)
+            {
+                return new Error() { Message = $"Unusable as hash key: {index.Type}" };
+            }
+
+            HashPair pair = null;
+
+            if (hash.Pairs.TryGetValue(key.HashKey(), out pair))
+            {
+                return pair.Value;
+            }
+
+            return Null;
         }
 
         private bool IsError(Object obj)
@@ -351,17 +483,18 @@ namespace Macaca
 
                 return obj;
             }
-            var function = obj as Function;
-
-            if (function == null)
+            switch (obj)
             {
-                return new Error() { Message = $"Not a function: {obj.Type}" };
+                case Function function:
+                    var extendEnv = ExtendFunctionEnv(function, args);
+                    var evaluated = this.Eval(function.Body, extendEnv);
+
+                    return UnwrapReturnValue(evaluated);
+                case Builtin builtin:
+                    return builtin.BuiltinFunction(args);
+                default:
+                    return new Error() { Message = $"Not a function: {obj.Type}" };
             }
-
-            var extendEnv = ExtendFunctionEnv(function, args);
-            var evaluated = this.Eval(function.Body, extendEnv);
-
-            return UnwrapReturnValue(evaluated);
         }
     }
 }

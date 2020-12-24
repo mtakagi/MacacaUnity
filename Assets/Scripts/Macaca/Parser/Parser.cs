@@ -14,7 +14,8 @@ namespace Macaca
         SUM,
         PRODUCT,
         PREFIX,
-        CALL
+        CALL,
+        INDEX
     }
 
     public class Parser
@@ -28,7 +29,8 @@ namespace Macaca
             {TokenType.MINUS, Precedence.SUM },
             {TokenType.SLASH, Precedence.PRODUCT },
             {TokenType.ASTERISK, Precedence.PRODUCT },
-            {TokenType.LPAREN, Precedence.CALL }
+            {TokenType.LPAREN, Precedence.CALL },
+            {TokenType.LBRACKET, Precedence.INDEX }
         };
 
         private Lexer lexer;
@@ -46,6 +48,7 @@ namespace Macaca
 
             RegisterPrefix(TokenType.IDENT, ParseIdentifier);
             RegisterPrefix(TokenType.INT, ParseIntegerLitral);
+            RegisterPrefix(TokenType.STRING, ParseStringLiteral);
             RegisterPrefix(TokenType.BANG, ParsePrefixExpression);
             RegisterPrefix(TokenType.MINUS, ParsePrefixExpression);
             RegisterPrefix(TokenType.TRUE, ParseBoolean);
@@ -53,6 +56,8 @@ namespace Macaca
             RegisterPrefix(TokenType.LPAREN, ParseGroupedExpression);
             RegisterPrefix(TokenType.IF, ParseIfExpression);
             RegisterPrefix(TokenType.FUNCTION, ParseFunctionLiteral);
+            RegisterPrefix(TokenType.LBRACKET, ParseArrayLiteral);
+            RegisterPrefix(TokenType.LBRACE, ParseHashLiteral);
 
             RegisterInfix(TokenType.PLUS, ParseInfixExpression);
             RegisterInfix(TokenType.MINUS, ParseInfixExpression);
@@ -64,6 +69,7 @@ namespace Macaca
             RegisterInfix(TokenType.GT, ParseInfixExpression);
 
             RegisterInfix(TokenType.LPAREN, ParseCallExpression);
+            RegisterInfix(TokenType.LBRACKET, ParseIndexExpression);
 
             this.NextToken();
             this.NextToken();
@@ -271,6 +277,52 @@ namespace Macaca
             return expression;
         }
 
+        public Expression ParseStringLiteral()
+        {
+            return new StringLiteral() { Token = this.currentToken, Value = this.currentToken.Literal };
+        }
+
+        public Expression ParseArrayLiteral()
+        {
+            return new ArrayLiteral()
+            {
+                Token = this.currentToken,
+                Elements = this.ParseExpressionList(TokenType.RBRACKET)
+            };
+        }
+
+        public Expression ParseHashLiteral()
+        {
+            var hash = new HashLiteral() { Token = this.currentToken, Pairs = new Dictionary<Expression, Expression>() };
+
+            while (!this.IsPeekTokenTypeEqualTo(TokenType.RBRACE))
+            {
+                this.NextToken();
+                var key = this.ParseExpression(Precedence.LOWEST);
+
+                if (!this.Expect(TokenType.COLON))
+                {
+                    return null;
+                }
+
+                this.NextToken();
+                var value = this.ParseExpression(Precedence.LOWEST);
+                hash.Pairs[key] = value;
+
+                if (!this.IsPeekTokenTypeEqualTo(TokenType.RBRACE) && !this.Expect(TokenType.COMMA))
+                {
+                    return null;
+                }
+            }
+
+            if (!this.Expect(TokenType.RBRACE))
+            {
+                return null;
+            }
+
+            return hash;
+        }
+
         public Expression ParsePrefixExpression()
         {
             var expression = new PrefixExpression()
@@ -460,15 +512,15 @@ namespace Macaca
             {
                 Token = this.currentToken,
                 Function = function,
-                Arguments = this.ParseCallArguments()
+                Arguments = this.ParseExpressionList(TokenType.RPAREN)
             };
         }
 
-        public Expression[] ParseCallArguments()
+        public Expression[] ParseExpressionList(TokenType end)
         {
             var list = new List<Expression>();
 
-            if (this.IsPeekTokenTypeEqualTo(TokenType.RPAREN))
+            if (this.IsPeekTokenTypeEqualTo(end))
             {
                 this.NextToken();
                 return list.ToArray();
@@ -484,12 +536,27 @@ namespace Macaca
                 list.Add(this.ParseExpression(Precedence.LOWEST));
             }
 
-            if (!this.Expect(TokenType.RPAREN))
+            if (!this.Expect(end))
             {
                 return null;
             }
 
             return list.ToArray();
+        }
+
+        public Expression ParseIndexExpression(Expression left)
+        {
+            var expression = new IndexExpresssion() { Token = this.currentToken, Left = left };
+
+            this.NextToken();
+            expression.Index = this.ParseExpression(Precedence.LOWEST);
+
+            if (!this.Expect(TokenType.RBRACKET))
+            {
+                return null;
+            }
+
+            return expression;
         }
 
         private void RegisterPrefix(TokenType type, PrefixParser prefix)

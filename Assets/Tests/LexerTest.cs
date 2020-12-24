@@ -23,7 +23,10 @@ if (5 < 10) {
 
 10 == 10;
 10 != 9;
-";
+""foobar""
+""foo bar""
+[1, 2];
+{""foo"" : ""bar""}";
 
     private static Token[] tokens = new[] {
         new Token() {Type = TokenType.LET, Literal = "let"},
@@ -99,6 +102,19 @@ if (5 < 10) {
         new Token() {Type = TokenType.NOT_EQ, Literal = "!="},
         new Token() {Type = TokenType.INT, Literal = "9"},
         new Token() {Type = TokenType.SEMICOLON, Literal = ";"},
+        new Token() {Type = TokenType.STRING, Literal = "foobar"},
+        new Token() {Type = TokenType.STRING, Literal = "foo bar"},
+        new Token() {Type = TokenType.LBRACKET, Literal = "["},
+        new Token() {Type = TokenType.INT, Literal = "1"},
+        new Token() {Type = TokenType.COMMA, Literal = ","},
+        new Token() {Type = TokenType.INT, Literal = "2"},
+        new Token() {Type = TokenType.RBRACKET, Literal = "]"},
+        new Token() {Type = TokenType.SEMICOLON, Literal = ";"},
+        new Token() {Type = TokenType.LBRACE, Literal = "{"},
+        new Token() {Type = TokenType.STRING, Literal = "foo"},
+        new Token() {Type = TokenType.COLON, Literal = ":"},
+        new Token() {Type = TokenType.STRING, Literal = "bar"},
+        new Token() {Type = TokenType.RBRACE, Literal = "}"},
         new Token() {Type = TokenType.EOF, Literal = ""},
     };
 
